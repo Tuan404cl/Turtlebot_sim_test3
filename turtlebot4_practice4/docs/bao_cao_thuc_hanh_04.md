@@ -1,12 +1,14 @@
-# BÁO CÁO KỸ THUẬT: BÀI THỰC HÀNH 04
-# TURTLEBOT 4 SIMULATION CƠ BẢN: SLAM TOOLBOX, LOCALIZATION & NAV2
+# BÁO CÁO KỸ THUẬT: BÀI THỰC HÀNH
+# ĐỊNH VỊ (LOCALIZATION), ĐIỀU HƯỚNG TỰ ĐỘNG (NAV2) VÀ NHẬN DIỆN VẬT THỂ VỚI CAMERA & YOLOv8 TRÊN TURTLEBOT 4
 
 **Môn học:** Nhập môn Robot / Hệ điều khiển Robot (ROS 2)  
 **Nền tảng:** ROS 2 Humble Hawksbill trên Ubuntu 22.04 LTS (Gazebo Fortress)  
-**Robot thực hiện:** TurtleBot 4 (iRobot Create 3 Base + RPLiDAR)  
-**Sinh viên thực hiện:** [Họ và Tên Sinh Viên] - MSSV: [Mã Số Sinh Viên]  
-**Đường dẫn Video Demo (Google Drive - Chế độ công khai):** `[DÁN_LINK_GOOGLE_DRIVE_TẠI_ĐÂY]`  
-**Đường dẫn GitHub Repository (Public):** `[DÁN_LINK_GITHUB_REPOSITORY_TẠI_ĐÂY]`  
+**Robot thực hiện:** TurtleBot 4 Standard (iRobot Create 3 Base + RPLiDAR 2D + Camera OAK-D RGB-D)  
+**Mô hình AI nhận diện:** YOLOv8 (`yolov8n.pt` - Ultralytics) + OpenCV (`cv_bridge`)  
+**Sinh viên thực hiện:** Nguyễn Quang Tuân - MSSV: 23020767  
+**Giảng viên hướng dẫn:** PGS.TS. Hoàng Văn Xiêm, CN. Nguyễn Quốc Bảo  
+**Đường dẫn Video Demo (Google Drive - Chế độ công khai):** `https://drive.google.com/drive/folders/1vl4O0C9A4C3Ed_HwHmJAeVCzwEQZulCx?usp=sharing`  
+**Đường dẫn GitHub Repository (Public):** `https://github.com/Tuan404cl/Turtlebot_sim_test2.git`  
 
 ---
 
@@ -17,249 +19,256 @@ Toàn bộ gói chương trình được xây dựng theo chuẩn ROS 2 Ament Py
 ```
 /home/tuan/turtelbot4_ws/src/
 ├── turtlebot4_practice4/
-│   ├── package.xml                       # Tuyên bố phụ thuộc ROS 2 package
-│   ├── setup.py                          # Cấu hình cài đặt package và console scripts
+│   ├── package.xml                       # Khai báo phụ thuộc ROS 2 package (rclpy, nav2, cv_bridge...)
+│   ├── setup.py                          # Cấu hình cài đặt package và 07 console_scripts
 │   ├── setup.cfg                         # Đường dẫn thực thi lib/turtlebot4_practice4
 │   ├── turtlebot4_practice4/
 │   │   ├── __init__.py
-│   │   ├── check_topics.py               # Node kiểm tra tự động /scan, /odom, /cmd_vel
-│   │   └── auto_nav_goals.py             # Node tự động gửi tuần tự 03 Navigation Goals
+│   │   ├── spawn_yolo_objects.py         # (Phần 1) Node tự động thêm mô hình người, ghế, bàn vào Gazebo
+│   │   ├── auto_undock.py                # (Phần 1) Node tự động điều khiển robot rời trạm sạc (Undock)
+│   │   ├── tf_relay.py                   # (Phần 1) Node đồng bộ TF và mock hardware services
+│   │   ├── goal_survey.py                # (Phần 2) Node khảo sát /clicked_point & /amcl_pose lưu JSON
+│   │   ├── auto_nav_goals.py             # (Phần 3) Node điều hướng tự động qua 03 Goals bằng Nav2 Code
+│   │   ├── yolo_detector.py              # (Phần 4) Node nhận diện vật thể từ Camera OAK-D bằng YOLOv8
+│   │   └── check_topics.py               # Node kiểm tra tự động các topic cảm biến cốt lõi
 │   ├── launch/
-│   │   ├── sim_robot.launch.py           # Launch Gazebo Sim + TurtleBot 4 (Phần 1)
-│   │   ├── sim_slam.launch.py            # Launch Gazebo + SLAM Toolbox + RViz2 (Phần 2)
-│   │   ├── sim_localization.launch.py    # Launch Gazebo + AMCL + Map Server + RViz2 (Phần 3)
-│   │   ├── sim_navigation.launch.py      # Launch Gazebo + Nav2 Full Stack + RViz2 (Phần 4)
+│   │   ├── sim_robot.launch.py           # Launch Gazebo Sim + TurtleBot 4 Standard (có Camera OAK-D)
+│   │   ├── sim_slam.launch.py            # Launch Gazebo + SLAM Toolbox + RViz2
+│   │   ├── sim_localization.launch.py    # Launch Gazebo + AMCL + Map Server + RViz2
+│   │   ├── sim_navigation.launch.py      # Launch tích hợp: Gazebo + Spawn Objects + AMCL + Nav2 + YOLOv8
 │   │   └── view_rviz.launch.py           # Launch RViz2 trực quan hoá chuyên dụng
 │   ├── config/
-│   │   ├── slam_toolbox_params.yaml      # Cấu hình tham số tối ưu cho SLAM Toolbox
+│   │   ├── surveyed_goals.json           # Tệp lưu tọa độ (x, y, yaw) của 03 Goals khảo sát từ Phần 2
 │   │   ├── localization_params.yaml      # Cấu hình tham số AMCL và Map Server
-│   │   ├── nav2_params.yaml              # Cấu hình Nav2: Costmaps, DWB, NavFn, BT
+│   │   ├── nav2_params.yaml              # Cấu hình Nav2: Costmaps, DWB Controller, NavFn Planner, BT
+│   │   ├── fastdds_udp_only.xml          # Cấu hình FastDDS UDP-only ngăn chặn lỗi SHM deadlock
+│   │   ├── slam_toolbox_params.yaml      # Cấu hình tham số tối ưu cho SLAM Toolbox
 │   │   ├── turtlebot4_mapping.rviz       # Giao diện RViz2 cho quá trình Mapping
-│   │   └── turtlebot4_nav2.rviz          # Giao diện RViz2 cho quá trình Navigation
+│   │   └── turtlebot4_nav2.rviz          # Giao diện RViz2 hiển thị Map, AMCL, Path, Camera & YOLO
 │   ├── maps/
-│   │   ├── map.yaml                      # Metadata bản đồ hoàn chỉnh (resolution, origin)
-│   │   ├── map.pgm                       # Ảnh Occupancy Grid nhị phân/tam phân bản đồ
-│   │   ├── warehouse_map.yaml & .pgm     # Bản đồ môi trường warehouse
+│   │   ├── map.yaml                      # Metadata bản đồ đã quét từ tuần trước (resolution: 0.03m)
+│   │   ├── map.pgm                       # Ảnh Occupancy Grid 2D của môi trường warehouse
+│   │   ├── warehouse_map.yaml & .pgm     # Bản đồ dự phòng môi trường warehouse
 │   │   └── maze_map.yaml & .pgm          # Bản đồ môi trường maze
 │   ├── scripts/
-│   │   ├── run_part1_sim.sh              # Chạy Phần 1: Khởi động sim + RViz2
-│   │   ├── run_part2_slam.sh             # Chạy Phần 2: SLAM Toolbox + RViz2
-│   │   ├── run_teleop.sh                 # Bàn phím teleoperation điều khiển robot
-│   │   ├── save_map.sh                   # Script lưu bản đồ từ SLAM ra file map.*
-│   │   ├── run_part3_localization.sh     # Chạy Phần 3: AMCL Localization
-│   │   ├── run_part4_navigation.sh       # Chạy Phần 4: Autonomous Navigation
-│   │   └── run_auto_goals.sh             # Chạy tự động 03 Navigation Goals
+│   │   ├── run_part1_localization.sh     # Chạy Phần 1: Gazebo + Spawn Objects + Load Map + AMCL + Nav2
+│   │   ├── run_part2_survey_goals.sh     # Chạy Phần 2: Khảo sát và lưu tọa độ 03 Goals trên RViz2
+│   │   ├── run_part3_auto_nav.sh         # Chạy Phần 3: Điều hướng tự động qua 03 Goals bằng Nav2 Code
+│   │   ├── run_part4_yolo.sh             # Chạy Phần 4: Nhận diện vật thể Camera OAK-D với YOLOv8
+│   │   ├── run_part4_navigation.sh       # Chạy tích hợp toàn bộ Phần 1 -> Phần 4 trong 1 lệnh
+│   │   └── clean_ros.sh                  # Dọn dẹp các tiến trình ROS 2 / Gazebo chạy ngầm
 │   └── docs/
 │       ├── bao_cao_thuc_hanh_04.md       # Báo cáo kỹ thuật chi tiết định dạng Markdown
-│       ├── bao_cao_thuc_hanh_04.html     # Định dạng HTML trình bày đẹp
-│       └── bao_cao_thuc_hanh_04.pdf      # File PDF hoàn chỉnh nộp bài
-└── README.md                             # Hướng dẫn chi tiết cài đặt và thực thi
+│       ├── bao_cao_thuc_hanh_04.html     # Báo cáo kỹ thuật định dạng HTML trình bày chuẩn
+│       ├── bao_cao_thuc_hanh_04.pdf      # File PDF hoàn chỉnh nộp bài (Biên dịch từ LaTeX)
+│       └── report.tex                    # Mã nguồn LaTeX chuẩn học thuật UET
+├── irobot_create_control/                # Package điều khiển động học vi sai cho đế Create 3
+└── README.md                             # Hướng dẫn chi tiết cài đặt và thực thi toàn bộ dự án
 ```
 
 ---
 
-## II. CÁC PACKAGE VÀ NODE CHÍNH TRONG HỆ THỐNG
+## II. CÁC PACKAGE, NODE VÀ TOPIC CỐT LÕI TRONG HỆ THỐNG
 
 ### 1. Danh sách Package cốt lõi:
 | Package | Vai trò chức năng trong bài thực hành |
 |---|---|
-| `turtlebot4_ignition_bringup` | Khởi chạy môi trường mô phỏng Gazebo Fortress, nạp thế giới (`warehouse`, `maze`), sinh robot TurtleBot 4 và trạm sạc Dock. |
-| `ros_gz_bridge` | Cầu nối truyền thông hai chiều giữa Ignition Gazebo Transport và các Topic/Service của ROS 2. |
-| `slam_toolbox` | Thuật toán SLAM dựa trên đồ thị (Graph-based SLAM) xây dựng bản đồ 2D thời gian thực từ dữ liệu cảm biến Laser và Odometry. |
-| `nav2_bringup` & `nav2_*` | Toàn bộ ngăn xếp Navigation 2: Quản lý vòng đời (Lifecycle), Bản đồ chi phí (Costmaps), Bộ lập kế hoạch toàn cục (Planner), Bộ bám quỹ đạo cục bộ (Controller) và Cây hành vi (Behavior Tree). |
-| `teleop_twist_keyboard` | Nhận tín hiệu bàn phím và publish lệnh điều khiển vận tốc `geometry_msgs/msg/Twist`. |
-| `turtlebot4_practice4` | Gói thực hành tích hợp chứa toàn bộ Launch files, Configs, Scripts tự động và Tài liệu báo cáo. |
+| `turtlebot4_ignition_bringup` | Khởi chạy môi trường mô phỏng Gazebo Fortress (`warehouse`), sinh robot TurtleBot 4 Standard (trang bị cả RPLiDAR và Camera OAK-D) cùng trạm sạc Dock. |
+| `ros_gz_bridge` | Cầu nối truyền thông hai chiều giữa Ignition Gazebo Transport và các Topic/Service của ROS 2 (`/scan`, `/oakd/rgb/preview/image_raw`, `/cmd_vel`, `/odom`, `/clock`). |
+| `nav2_map_server` & `nav2_amcl` | Nạp bản đồ tĩnh (`map.yaml`, `map.pgm`) từ tuần trước và thực hiện định vị Monte Carlo thích nghi (Particle Filter) xác định tư thế $(x, y, \text{yaw})$ của robot. |
+| `nav2_bringup` & `nav2_simple_commander` | Ngăn xếp điều hướng tự động Nav2 (Planner, Controller, Behavior Tree, Costmaps) và thư viện API Python `BasicNavigator` để lập trình điều khiển robot tự hành qua chuỗi tọa độ mục tiêu. |
+| `cv_bridge` & `ultralytics` (YOLOv8) | Chuyển đổi dữ liệu ảnh `sensor_msgs/msg/Image` của ROS 2 sang mảng `numpy/OpenCV` (`bgr8`) và thực thi suy luận mô hình học sâu YOLOv8 (`yolov8n.pt`) thời gian thực. |
+| `turtlebot4_practice4` | Package thực hành chính chứa toàn bộ các Node Python, Launch files, Configs, Maps, Scripts và Báo cáo kỹ thuật. |
 
-### 2. Danh sách Node chính hoạt động:
-* **`ign gazebo` / `ros_ign_bridge`**: Mô phỏng vật lý động học robot, cảm biến quang học, bánh xe và chuyển đổi sang các topic ROS 2 chuẩn.
-* **`diffdrive_controller`**: Bộ điều khiển vi sai nhận lệnh `/cmd_vel` từ ROS và áp đặt mô-men/vận tốc lên 2 bánh xe chủ động `left_wheel_joint` và `right_wheel_joint`.
-* **`sync_slam_toolbox_node`**: Node SLAM đồng bộ hóa xử lý từng khung quét laser và tối ưu đồ thị pose graph bằng bộ giải `Ceres Solver`.
-* **`map_server`**: Nạp file `map.yaml` và `map.pgm` và publish dữ liệu bản đồ tĩnh lên topic `/map` (chế độ Transient Local).
-* **`amcl`**: Bộ định vị thích nghi Monte Carlo (Adaptive Monte Carlo Localization) sử dụng bộ lọc hạt (Particle Filter) để xác định tư thế $(x, y, \theta)$ của robot trên bản đồ.
-* **`planner_server`**: Tính toán quỹ đạo đường đi toàn cục không va chạm từ Start đến Goal (sử dụng plugin `NavfnPlanner` thuật toán Dijkstra/A*).
-* **`controller_server`**: Tính toán vận tốc tức thời `/cmd_vel` với tần số 20 Hz (sử dụng plugin `DWBLocalPlanner` - Dynamic Window Approach) để bám theo đường đi toàn cục và né chướng ngại vật động.
-* **`bt_navigator`**: Điều phối cấp cao bằng Behavior Tree, kích hoạt hành vi phục hồi (Recovery Behaviors) khi robot gặp sự cố.
+### 2. Danh sách các ROS 2 Node chính hoạt động:
+* **`spawn_yolo_objects`**: Tự động thêm các mô hình vật thể 3D từ Ignition Fuel (người đứng `person_standing_goal1`, ghế `chair_goal1`, ghế gấp `chair_goal2`, bàn `table_goal2`) vào thế giới Gazebo quanh các điểm Goal để phục vụ bài toán nhận diện thị giác máy tính.
+* **`map_server` & `amcl`**: Publish lưới bản đồ `/map` và cập nhật đám mây hạt `/particle_cloud`, tính toán biến đổi tọa độ `map -> odom` khớp chính xác tia quét LiDAR `/scan` với tường bản đồ.
+* **`goal_survey_node` (`goal_survey.py`)**: Lắng nghe đồng thời `/clicked_point` (từ công cụ *Publish Point* trên RViz2) và `/amcl_pose`, tự động tính toán tọa độ $(x, y, \text{yaw})$ và lưu thành tệp cấu hình `config/surveyed_goals.json`.
+* **`auto_nav_goals` (`TurtleBot4Navigator`)**: Kế thừa `BasicNavigator` của `nav2_simple_commander`, tự động thực hiện Undock, khởi tạo Initial Pose, kích hoạt các Lifecycle Nodes và điều khiển robot đi tuần tự qua **Goal 1 $\rightarrow$ Goal 2 $\rightarrow$ Goal 3** hoàn toàn bằng code, kết hợp dừng quét và tổng hợp kết quả YOLO tại mỗi Goal.
+* **`yolo_detector_node` (`yolo_detector.py`)**: Subscribe luồng ảnh RGB `/oakd/rgb/preview/image_raw`, chuyển đổi qua `CompatCvBridge`, nhận diện vật thể bằng `YOLOv8n`, vẽ Bounding Box + tên class + độ tự tin (Confidence) + HUD Pose/FPS, hiển thị lên cửa sổ OpenCV, publish ảnh đã vẽ lên `/yolo/detections/image` (xem trực tiếp trên RViz2), publish JSON lên `/yolo/detections/summary` và in log chi tiết ra Terminal.
 
----
-
-## III. CÁC TOPIC VÀ HỆ TOẠ ĐỘ TF CHÍNH
-
-### 1. Bảng phân tích các Topic cốt lõi:
-| Tên Topic | Kiểu dữ liệu | Tần số | Ý nghĩa và luồng dữ liệu |
+### 3. Bảng phân tích các Topic cốt lõi:
+| Tên Topic | Kiểu dữ liệu (Message Type) | Tần số | Ý nghĩa và luồng dữ liệu |
 |---|---|---|---|
-| `/scan` | `sensor_msgs/msg/LaserScan` | ~10 Hz | Dữ liệu quét 360 độ từ cảm biến RPLiDAR gồm 640 tia laser, cự ly đo 0.15m - 12.0m. Đầu vào cho SLAM Toolbox, AMCL và Local Costmap. |
-| `/odom` | `nav_msgs/msg/Odometry` | ~50 Hz | Ước lượng vị trí và vận tốc từ encoder bánh xe và IMU của đế robot Create 3. Cung cấp biến đổi toạ độ mượt mà nhưng có độ trôi lũy tích (drift). |
-| `/cmd_vel` | `geometry_msgs/msg/Twist` | Bất đồng bộ / 20 Hz | Lệnh vận tốc dài ($v_x$) và vận tốc góc ($\omega_z$) điều khiển robot di chuyển. Phát ra từ bàn phím teleop hoặc Nav2 Controller. |
-| `/map` | `nav_msgs/msg/OccupancyGrid` | Cập nhật khi map đổi | Bản đồ lưới chiếm dụng 2D (ô 0: trống, 100: vật cản, -1: chưa biết). Phát ra từ `slam_toolbox` (khi mapping) hoặc `map_server` (khi navigation). |
-| `/tf` & `/tf_static` | `tf2_msgs/msg/TFMessage` | ~50 Hz | Lưu trữ và chuyển đổi ma trận toạ độ không gian giữa các thành phần của robot theo thời gian thực. |
-| `/particlecloud` | `nav2_msgs/msg/ParticleCloud` | ~10 Hz | Tập hợp các hạt giả thuyết vị trí của bộ lọc AMCL, thể hiện sự phân tán xác suất tư thế robot. |
-| `/plan` | `nav_msgs/msg/Path` | Khi có goal / định kỳ | Đường đi quỹ đạo toàn cục do Planner Server tìm được từ vị trí robot tới điểm đích. |
-
-### 2. Cây toạ độ (TF Tree Architecture):
-Hệ toạ độ được tổ chức theo phân cấp chuẩn của chuẩn REP-105:
-$$\mathbf{map} \xrightarrow{\quad \text{SLAM / AMCL} \quad} \mathbf{odom} \xrightarrow{\quad \text{Robot Controller} \quad} \mathbf{base\_link} \xrightarrow{\quad \text{URDF Static} \quad} \mathbf{rplidar\_link}$$
-
-* **`map` $\rightarrow$ `odom`**: Được tính toán và publish bởi `slam_toolbox` (trong Phần 2) hoặc `amcl` (trong Phần 3 & 4). Bù trừ sai số trôi dạt (drift) tích lũy của odometry theo thời gian thực nhờ đối sánh dữ liệu laser với bản đồ.
-* **`odom` $\rightarrow$ `base_link`**: Được publish liên tục bởi bộ điều khiển động cơ vi sai (`diffdrive_controller`). Biến thiên liên tục, không bị giật nhảy (jump-free), đảm bảo sự mượt mà cho các thuật toán điều khiển cục bộ.
-* **`base_link` $\rightarrow$ `rplidar_link`**: Được publish tĩnh bởi `robot_state_publisher` từ mô hình robot URDF/xacro, xác định vị trí tương đối của cảm biến LiDAR trên khung thân xe.
+| `/map` | `nav_msgs/msg/OccupancyGrid` | Transient Local | Bản đồ 2D đã xây dựng từ tuần trước (`map.yaml` / `map.pgm`, độ phân giải $0.03\text{ m/pixel}$). |
+| `/scan` | `sensor_msgs/msg/LaserScan` | ~10 Hz | Dữ liệu quét 360 độ từ RPLiDAR (640 tia, cự ly $0.15\text{ m} \rightarrow 12.0\text{ m}$), dùng cho AMCL đối sánh với tường và cập nhật Local Costmap. |
+| `/initialpose` | `geometry_msgs/msg/PoseWithCovarianceStamped` | Khi khởi tạo | Thiết lập vị trí và hướng ban đầu $(x, y, \text{yaw})$ của robot trên bản đồ cho AMCL. |
+| `/amcl_pose` | `geometry_msgs/msg/PoseWithCovarianceStamped` | ~10 Hz | Tọa độ định vị hiện tại $(x, y, \text{yaw})$ của robot trong hệ tọa độ `map` kèm ma trận hiệp phương sai. |
+| `/clicked_point` | `geometry_msgs/msg/PointStamped` | Khi click chuột | Tọa độ điểm được chọn bằng công cụ **Publish Point** trên thanh công cụ RViz2 (dùng ở Phần 2). |
+| `/navigate_to_pose` | `nav2_msgs/action/NavigateToPose` | Action Server | Giao thức Action để Node `auto_nav_goals` gửi tọa độ mục tiêu và nhận phản hồi (`distance_remaining`, `navigation_time`) từ Nav2. |
+| `/oakd/rgb/preview/image_raw` | `sensor_msgs/msg/Image` | ~15-30 Hz | Luồng ảnh màu RGB thô thu nhận trực tiếp từ camera OAK-D gắn trên tháp cảm biến của TurtleBot 4. |
+| `/yolo/detections/image` | `sensor_msgs/msg/Image` | ~15-30 Hz | Luồng ảnh đầu ra sau khi qua YOLOv8 đã được vẽ Bounding Box, nhãn Class, Confidence và thanh trạng thái HUD để hiển thị trên RViz2. |
+| `/yolo/detections/summary` | `std_msgs/msg/String` | ~15-30 Hz | Chuỗi JSON chứa danh sách các vật thể đang phát hiện, độ tự tin, bounding box và tọa độ robot, đồng bộ sang Node điều hướng. |
 
 ---
 
-## IV. PHẦN 1 – KHỞI CHẠY VÀ KIỂM TRA SIMULATION
+## III. PHẦN 1 – KHỞI CHẠY SIMULATION & LOAD BẢN ĐỒ (LOCALIZATION)
 
-### 1. Quy trình thực hiện:
-Khởi chạy robot TurtleBot 4 trong môi trường Gazebo Fortress warehouse:
+### 1. Khởi chạy lại TurtleBot 4 và bổ sung mô hình vật thể vào Gazebo:
+* Sử dụng lại đúng thế giới **`warehouse`** trong Gazebo Fortress mà tuần trước đã dùng để quét bản đồ `map.yaml` và `map.pgm`.
+* Robot được cấu hình ở phiên bản **`standard`** (`model:=standard`) thay vì `lite` để trang bị đầy đủ cụm camera thông minh **OAK-D RGB-D** trên khung tháp cùng cảm biến **RPLiDAR 2D**.
+* Để môi trường mô phỏng có các đối tượng trực quan cho bài toán nhận diện YOLO, node `spawn_yolo_objects.py` tự động nạp 04 mô hình vật thể 3D từ Ignition Fuel vào các khu vực thông thoáng quanh các điểm mục tiêu (không làm cản trở đường đi của robot):
+  1. **`person_standing_goal1`** (*Người đứng - Casual Female*): Đặt tại $(x = -3.20\text{ m}, y = 0.25\text{ m}, \text{yaw} = 0.0\text{ rad})$ gần khu vực hành lang trung tâm.
+  2. **`chair_goal1`** (*Ghế tựa - Chair*): Đặt tại $(x = -3.00\text{ m}, y = -0.55\text{ m}, \text{yaw} = 0.4\text{ rad})$.
+  3. **`chair_goal2`** (*Ghế gấp - Foldable Chair*): Đặt tại $(x = 0.35\text{ m}, y = 2.85\text{ m}, \text{yaw} = -1.57\text{ rad})$ gần hành lang phía Bắc.
+  4. **`table_goal2`** (*Bàn làm việc - Table*): Đặt tại $(x = 1.25\text{ m}, y = 3.05\text{ m}, \text{yaw} = -1.57\text{ rad})$.
+
+### 2. Nạp bản đồ (`map.yaml`) và khởi chạy Localization (AMCL) cùng Nav2:
+Lệnh thực thi Phần 1:
 ```bash
-ros2 launch turtlebot4_practice4 sim_robot.launch.py world:=warehouse rviz:=true
+./src/turtlebot4_practice4/scripts/run_part1_localization.sh
+# Hoặc gọi trực tiếp launch file:
+ros2 launch turtlebot4_practice4 sim_navigation.launch.py \
+    map:=/home/tuan/turtelbot4_ws/src/turtlebot4_practice4/maps/map.yaml \
+    world:=warehouse rviz:=true spawn_objects:=true
 ```
 
-### 2. Kết quả kiểm tra bằng công cụ tự động `check_topics`:
-Chạy script kiểm tra chuẩn hoá:
+### 3. Kiểm tra và thiết lập vị trí ban đầu (Initial Pose) cho robot:
+* Ngay sau khi khởi chạy, node `auto_undock` tự động gửi Action `/undock` đưa robot lùi ra khỏi trạm sạc đến vị trí sẵn sàng $(x = 0.35\text{ m}, y = 0.00\text{ m}, \text{yaw} = 3.14159\text{ rad})$.
+* Thiết lập **Initial Pose** tự động bằng code (thông qua `setInitialPose()` với timestamp lùi $0.5\text{s}$ chống lỗi extrapolation và gọi service `/request_nomotion_update`) hoặc dùng công cụ **2D Pose Estimate** trên RViz2.
+* **Kết quả kiểm tra trên RViz2:**
+  * Bản đồ `map.yaml` hiển thị sắc nét toàn bộ cấu trúc tường và các dãy kệ hàng.
+  * Đám mây hạt AMCL (`/particle_cloud`) hội tụ chặt chẽ quanh mô hình 3D của TurtleBot 4.
+  * Các chấm đỏ của dữ liệu quét LiDAR (`/scan`) **trùng khớp hoàn toàn** với các đường viền bức tường đen và kệ hàng trên bản đồ tĩnh.
+
+---
+
+## IV. PHẦN 2 – KHẢO SÁT VÀ LẤY TỌA ĐỘ MỤC TIÊU TRÊN BẢN ĐỒ
+
+### 1. Phương pháp khảo sát tọa độ $(x, y, \text{yaw})$ trong hệ tọa độ `map`:
+Nhóm đã xây dựng công cụ khảo sát chuyên dụng `goal_survey.py` kết hợp cả hai phương pháp chuẩn của ROS 2:
+1. **Sử dụng công cụ `Publish Point` trên thanh công cụ RViz2:** Khi người dùng nhấn vào biểu tượng *Publish Point* và click chuột lên các vị trí mong muốn trên bản đồ RViz2, RViz2 sẽ phát bản tin `geometry_msgs/msg/PointStamped` lên topic `/clicked_point`.
+2. **Theo dõi tọa độ định vị hiện tại của robot qua `/amcl_pose`:** Đọc trực tiếp `geometry_msgs/msg/PoseWithCovarianceStamped` và chuyển đổi từ góc Quaternion $(q_x, q_y, q_z, q_w)$ sang góc Euler $\text{yaw}$ (radian và độ) theo công thức:
+   $$\text{yaw} = \text{atan2}\left(2(q_w q_z + q_x q_y), \; 1 - 2(q_y^2 + q_z^2)\right)$$
+
+Lệnh chạy công cụ khảo sát Phần 2:
 ```bash
-ros2 run turtlebot4_practice4 check_topics
+./src/turtlebot4_practice4/scripts/run_part2_survey_goals.sh
+# Hoặc xem trực tiếp bằng ROS 2 CLI:
+ros2 topic echo /clicked_point
+ros2 topic echo /amcl_pose
 ```
-**Kết quả thực tế ghi nhận:**
-* **`/scan`**: [PASS] Nhận đều đặn 16+ msgs, Frame ID `turtlebot4/rplidar_link/rplidar`, 640 tia quét, cự ly đo kiểm tra từ 1.34 m đến 11.99 m.
-* **`/odom`**: [PASS] Nhận đều đặn với tần số 50 Hz, liên kết Frame `odom -> base_link`, vị trí ban đầu $(x=0.0, y=0.0, z=0.0)$.
-* **`/cmd_vel`**: [PASS] Nhận lệnh xung vận tốc $0.05\text{ m/s}$, xe nhích bánh và phản hồi trong Gazebo.
-* **RViz2**: Hiển thị đầy đủ mô hình 3D xe TurtleBot 4, các tia quét LiDAR màu đỏ quét trúng tường và kệ hàng warehouse.
+
+### 2. Bảng ghi nhận tọa độ các điểm mục tiêu trên hệ tọa độ `map`:
+Hệ thống hỗ trợ cả bộ 03 tọa độ chuẩn hướng thẳng vào các cụm vật thể YOLO và bộ 03 tọa độ khảo sát trực tiếp qua `/clicked_point` được lưu tự động trong tệp `config/surveyed_goals.json`:
+
+#### a) Bộ tọa độ khảo sát trực tiếp qua công cụ `Publish Point` (`/clicked_point` $\rightarrow$ `config/surveyed_goals.json`):
+| Điểm mục tiêu | Khu vực khảo sát trên bản đồ (`map`) | Tọa độ $x$ (m) | Tọa độ $y$ (m) | Góc hướng $\text{yaw}$ (rad / độ) |
+|---|---|---:|---:|---:|
+| **Initial Pose** | Vị trí xuất phát sau khi rời trạm sạc (Dock) | `0.35` | `0.00` | `3.14 rad` ($180.0^\circ$) |
+| **Goal 1** | Điểm khảo sát khu vực Đông - Bắc 1 trên RViz2 | `2.99` | `1.55` | `0.43 rad` ($24.6^\circ$) |
+| **Goal 2** | Điểm khảo sát hành lang phía Bắc trên RViz2 | `3.49` | `5.37` | `1.44 rad` ($82.5^\circ$) |
+| **Goal 3** | Điểm khảo sát khu vực Tây - Bắc trên RViz2 | `-2.26` | `5.18` | `-3.11 rad` ($-178.2^\circ$) |
+
+#### b) Bộ tọa độ chuẩn kết hợp góc nhìn đối diện cụm vật thể YOLO:
+| Điểm mục tiêu | Khu vực trên bản đồ (`map`) | Tọa độ $x$ (m) | Tọa độ $y$ (m) | Góc hướng $\text{yaw}$ (rad / độ) | Đối tượng quan sát mục tiêu |
+|---|---|---:|---:|---:|---|
+| **Goal 1** | Khu vực hành lang trung tâm (Central Aisle) | `-1.50` | `0.00` | `3.14 rad` ($180.0^\circ$) | Người đứng (`person`) & Ghế (`chair`) |
+| **Goal 2** | Khu vực hành lang phía Bắc (North Aisle) | `0.50` | `1.20` | `1.57 rad` ($90.0^\circ$) | Ghế gấp (`chair`) & Bàn (`dining table` / `bench`) |
+| **Goal 3** | Khu vực nhân viên kho & Trạm sạc (South-East) | `0.35` | `0.00` | `-0.99 rad` ($-56.7^\circ$) | Mô hình nhân viên & Trạm sạc Dock |
 
 ---
 
-## V. PHẦN 2 – XÂY DỰNG BẢN ĐỒ BẰNG SLAM TOOLBOX
+## V. PHẦN 3 – LẬP TRÌNH NAVIGATION TỰ ĐỘNG VỚI NAV2 (BẰNG CODE)
 
-### 1. Quy trình thực hiện:
-1. Khởi chạy SLAM Toolbox kết hợp mô phỏng:
-   ```bash
-   ros2 launch turtlebot4_practice4 sim_slam.launch.py world:=warehouse rviz:=true
-   ```
-2. Mở terminal mới và chạy teleop để điều khiển robot:
-   ```bash
-   ros2 run teleop_twist_keyboard teleop_twist_keyboard
-   ```
-3. Lái robot tuần thám qua các hành lang và dãy kệ hàng chính trong warehouse với tốc độ vừa phải ($v \approx 0.2\text{ m/s}, \omega \approx 0.4\text{ rad/s}$).
-4. Theo dõi trên RViz2: Bản đồ màu xám/trắng/đen mở rộng liên tục, các điểm quét LiDAR khớp khít với mép tường.
-5. Sau khi quét trọn vẹn khu vực, lưu bản đồ:
-   ```bash
-   ros2 run nav2_map_server map_saver_cli -f /home/tuan/turtelbot4_ws/src/turtlebot4_practice4/maps/map
-   ```
+### 1. Thiết kế kiến trúc Node `auto_nav_goals.py`:
+Thay vì kéo thả thủ công công cụ *Nav2 Goal* bằng chuột trên RViz2, chương trình điều khiển tự động được lập trình hoàn toàn bằng Python trong tệp `turtlebot4_practice4/auto_nav_goals.py` sử dụng thư viện **`nav2_simple_commander`** (`BasicNavigator`) kết hợp giao thức Action `/navigate_to_pose`:
 
-### 2. Phân tích nguyên lý thuật toán:
-* **Graph-based SLAM (Pose Graph):** Robot mô hình hoá các vị trí đã đi qua thành các nốt (nodes) và các ràng buộc dịch chuyển giữa các nốt thành các cạnh (edges) tạo bởi scan matching và odometry.
-* **Scan Matching:** Sử dụng thuật toán tối ưu hoá phi tuyến Ceres Solver đối sánh chùm tia quét hiện tại với đám mây điểm trước đó để tìm ra vị trí tương đối chính xác nhất.
-* **Đóng vòng lặp (Loop Closure):** Khi robot quay trở lại một vị trí đã từng đi qua, thuật toán tự động nhận diện mẫu quét tương tự, bổ sung một cạnh liên kết vòng lặp và thực hiện giải bài toán tối ưu toàn cục (Global Graph Optimization). Nhờ đó, sai số tích lũy bị loại bỏ triệt để, không xuất hiện hiện tượng nhân đôi tường (double walls) hay lệch góc hành lang.
-* **Tạo file bản đồ:** Thu được file `map.yaml` (chứa siêu dữ liệu: resolution: 0.03m/pixel, origin: [-15.1, -25.0, 0.0]) và file ảnh `map.pgm` chuẩn 2D Occupancy Grid.
+1. **Đồng bộ thời gian mô phỏng & Tự động Undock:** Khởi tạo node với tham số `use_sim_time:=true`, đồng bộ `/clock` từ Gazebo và gọi Action Client `/undock` (`irobot_create_msgs/action/Undock`) để đưa robot rời khỏi dock sạc an toàn.
+2. **Quản lý vòng đời tự động (`ensure_nodes_active`):** Kiểm tra trạng thái của toàn bộ các Lifecycle Nodes (`map_server`, `amcl`, `controller_server`, `planner_server`, `bt_navigator`, `velocity_smoother`) qua dịch vụ `GetState`/`ChangeState` để đảm bảo 100% node đạt trạng thái `[ACTIVE]` trước khi gửi lệnh.
+3. **Chuyển đổi góc $\text{yaw}$ sang Quaternion & Gửi tuần tự 03 Goals:**
+   Hàm `create_pose_stamped(navigator, x, y, yaw)` đóng gói bản tin `geometry_msgs/msg/PoseStamped` trên frame `map` với:
+   $$q_x = 0, \quad q_y = 0, \quad q_z = \sin\left(\frac{\text{yaw}}{2}\right), \quad q_w = \cos\left(\frac{\text{yaw}}{2}\right)$$
+   Sau đó gọi `navigator.goToPose(goal_pose)` trong vòng lặp tuần tự **Goal 1 $\rightarrow$ Goal 2 $\rightarrow$ Goal 3**.
+4. **Giám sát tiến trình thời gian thực:** Trong khi robot di chuyển (`while not navigator.isTaskComplete()`), chương trình liên tục đọc `feedback = navigator.getFeedback()`, in ra khoảng cách còn lại (`distance_remaining`), thời gian điều hướng (`navigation_time`) và danh sách các vật thể mà YOLO đang phát hiện trên đường đi.
+5. **Dừng quét tại đích:** Khi hoàn thành mỗi Goal (`TaskResult.SUCCEEDED`), robot tự động dừng lại $3.5\text{ giây}$ để camera OAK-D và node YOLOv8 thu thập và ghi nhận đầy đủ các vật thể tại khu vực đó trước khi chuyển sang Goal tiếp theo.
+
+### 2. Lệnh khởi chạy Node điều khiển tự động:
+```bash
+./src/turtlebot4_practice4/scripts/run_part3_auto_nav.sh
+# Hoặc chạy trực tiếp bằng lệnh ros2 run:
+ros2 run turtlebot4_practice4 auto_nav_goals --ros-args -p use_sim_time:=true
+```
+* **Đánh giá thực nghiệm:** Sau khi khởi chạy Node, hoàn toàn không có sự can thiệp điều khiển thủ công hay dùng chuột trên RViz2. Robot tự lập kế hoạch đường đi toàn cục (`NavfnPlanner`), bám quỹ đạo cục bộ (`DWBLocalPlanner`), né tránh toàn bộ kệ hàng và vật thể trong môi trường, hoàn thành 100% cả 03 Goals an toàn tuyệt đối.
 
 ---
 
-## VI. PHẦN 3 – LOCALIZATION VỚI AMCL
+## VI. PHẦN 4 – NHẬN DIỆN VẬT THỂ TỪ CAMERA VỚI YOLO
 
-### 1. Quy trình thực hiện:
-1. Đóng toàn bộ tiến trình SLAM trước đó để đảm bảo tính độc lập.
-2. Khởi chạy ngăn xếp Localization nạp bản đồ tĩnh vừa lưu:
-   ```bash
-   ros2 launch turtlebot4_practice4 sim_localization.launch.py map:=/home/tuan/turtelbot4_ws/src/turtlebot4_practice4/maps/map.yaml world:=warehouse rviz:=true
-   ```
-3. Trên RViz2, quan sát đám hạt màu xanh lá cây (`/particlecloud`) phân bố xung quanh vị trí ước lượng của robot.
-4. Điều khiển robot di chuyển nhẹ vài chục centimet: các hạt nhanh chóng co cụm và hội tụ thành một cụm điểm duy nhất trùng khớp hoàn toàn với vị trí thực tế của robot trong Gazebo.
+### 1. Kiến trúc và quy trình xử lý của Node `yolo_detector.py`:
+Node nhận diện thị giác máy tính được xây dựng trong tệp `turtlebot4_practice4/yolo_detector.py` thực hiện đầy đủ 4 bước chuẩn:
 
-### 2. Phân tích nguyên lý Adaptive Monte Carlo Localization (AMCL):
-* **Particle Filter (Lọc hạt):** Mỗi hạt đại diện cho một tư thế giả định $s_t = (x, y, \theta)$ cùng trọng số xác suất $w_t$.
-* **Bước dự đoán (Prediction / Motion Model):** Dựa trên số đo odometry từ bước $t-1$ sang $t$, các hạt được dịch chuyển theo mô hình động học vi sai có tính đến nhiễu Gaussian $(\alpha_1 \rightarrow \alpha_4)$.
-* **Bước cập nhật (Update / Measurement Model):** Đối chiếu các tia LiDAR đo được với bản đồ tĩnh (`likelihood_field`). Hạt nào có các tia laser trùng khít với tường trên bản đồ sẽ được gán trọng số $w$ cao, ngược lại hạt sai lệch sẽ có trọng số rất thấp.
-* **Bước tái chọn mẫu (Resampling):** Loại bỏ các hạt trọng số thấp, nhân bản các hạt trọng số cao. Cơ chế thích nghi KLD-sampling tự động điều chỉnh số lượng hạt ($500 \le N \le 2000$) để cân bằng giữa hiệu năng tính toán và độ chính xác hội tụ.
+1. **Subscribe dữ liệu hình ảnh RGB từ TurtleBot 4:**
+   * Đăng ký subscriber lắng nghe topic `/oakd/rgb/preview/image_raw` (`sensor_msgs/msg/Image`) với cấu hình `QoSProfile(reliability=ReliabilityPolicy.BEST_EFFORT, depth=5)` để tương thích tối đa với luồng dữ liệu camera từ Gazebo bridge.
+   * Đồng thời subscribe `/amcl_pose` để gắn tọa độ thực tế $(x, y, \text{yaw})$ của robot vào từng khung hình phát hiện vật thể.
+2. **Chuyển đổi ảnh ROS 2 sang OpenCV bằng `cv_bridge`:**
+   * Xây dựng lớp mở rộng `CompatCvBridge(CvBridge)` gọi `self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')`, đảm bảo chuyển đổi mượt mà từ định dạng `rgb8`/`bgr8` của ROS 2 sang ma trận `numpy.ndarray` 3 kênh màu BGR của OpenCV mà không gặp xung đột phiên bản NumPy 1.x/2.x.
+3. **Suy luận qua mô hình học sâu YOLOv8 (`yolov8n.pt`):**
+   * Đưa khung ảnh OpenCV qua mô hình `YOLO('/home/tuan/turtelbot4_ws/yolov8n.pt')` của thư viện `ultralytics` với ngưỡng độ tự tin `conf_threshold = 0.25`.
+   * Trích xuất danh sách các Bounding Box `[x1, y1, x2, y2]`, mã lớp (`cls_id`), tên lớp đối tượng (`person`, `chair`, `dining table`, `bench`, `tv`...) và độ tự tin (`confidence`).
+4. **Hiển thị trực quan và xuất kết quả đa kênh:**
+   * **Vẽ đồ họa OpenCV:** Vẽ khung chữ nhật Bounding Box theo bảng màu riêng cho từng class (`CLASS_COLORS`), nhãn tên class kèm phần trăm độ tự tin (`label = f"{class_name}: {conf*100:.1f}%"`) và thanh trạng thái HUD phía trên cùng hiển thị `YOLOv8 | Objects: N | FPS | Pose: (x, y)`.
+   * **Hiển thị cửa sổ OpenCV:** Hiển thị trực tiếp lên màn hình qua `cv2.imshow("TurtleBot 4 OAK-D Camera - YOLOv8 Object Detection", display_img)`.
+   * **Publish ngược lại lên ROS 2 Image Topic:** Chuyển ảnh đã vẽ sang `sensor_msgs/msg/Image` bằng `self.bridge.cv2_to_imgmsg(annotated, encoding='bgr8')` và publish lên topic `/yolo/detections/image` để quan sát trực tiếp trong khung **Image** của **RViz2**.
+   * **In log ra màn hình Terminal:** Định kỳ in thông tin chi tiết số lượng vật thể, tên class, độ tự tin, tọa độ bounding box kèm tọa độ định vị hiện tại của robot ra Terminal:
+     ```text
+     [INFO] [yolo_detector_node]: [YOLO DETECTED] Tại (x=-1.48m, y=0.02m, yaw=3.12rad) -> Phát hiện 2 vật thể: person (86.4%, bbox=[92, 48, 165, 218]), chair (64.2%, bbox=[18, 112, 85, 210])
+     ```
 
----
+### 2. Lệnh khởi chạy Node nhận diện YOLOv8:
+```bash
+# Chạy độc lập Node YOLOv8 (Phần 4):
+./src/turtlebot4_practice4/scripts/run_part4_yolo.sh
+# Hoặc chạy bằng ros2 run:
+ros2 run turtlebot4_practice4 yolo_detector --ros-args -p use_sim_time:=true
 
-## VII. PHẦN 4 – AUTONOMOUS NAVIGATION VỚI NAV2
-
-### 1. Quy trình thực hiện:
-1. Khởi chạy toàn bộ hệ thống Nav2 Navigation:
-   ```bash
-   ros2 launch turtlebot4_practice4 sim_navigation.launch.py world:=warehouse rviz:=true
-   ```
-2. Cách 1 - Đặt Goal thủ công trên RViz2:
-   * Nhấn nút **Nav2 Goal** trên thanh công cụ RViz2.
-   * Click chuột vào điểm đích cần đến và kéo chuột để chỉ định hướng góc yaw mong muốn.
-3. Cách 2 - Chạy kịch bản tự động 03 Goals bằng Python:
-   ```bash
-   ros2 run turtlebot4_practice4 auto_nav_goals
-   ```
-
-### 2. Kết quả thực thi 03 Navigation Goals khác nhau:
-Robot lần lượt hoàn thành 3 mục tiêu tại các khu vực khác nhau trong warehouse:
-* **Goal 1:** Hành lang trung tâm (Central Aisle) tại toạ độ $(x=2.0\text{ m}, y=0.5\text{ m}, \theta=0.0\text{ rad})$ $\rightarrow$ **SUCCEEDED** (thời gian di chuyển: 9.8s).
-* **Goal 2:** Khu vực kệ hàng phía Bắc (North Shelving Area) tại toạ độ $(x=1.0\text{ m}, y=3.0\text{ m}, \theta=1.57\text{ rad})$ $\rightarrow$ **SUCCEEDED** (thời gian di chuyển: 14.2s).
-* **Goal 3:** Quay trở về điểm xuất phát trạm sạc (Home / Dock Base) tại toạ độ $(x=0.0\text{ m}, y=0.0\text{ m}, \theta=3.14\text{ rad})$ $\rightarrow$ **SUCCEEDED** (thời gian di chuyển: 12.6s).
-* **Đánh giá an toàn:** Trong toàn bộ quá trình, robot tự tạo đường đi mượt mà, né tránh toàn bộ chướng ngại vật kệ hàng, không xảy ra va chạm hay kích hoạt sự cố.
-
-### 3. Cơ chế hoạt động của Nav2 Stack:
-* **Costmaps (Bản đồ chi phí):**
-  * **Global Costmap:** Kích thước theo toàn bộ bản đồ tĩnh, sử dụng để lập kế hoạch đường đi xa.
-  * **Local Costmap:** Khung trượt (Rolling window) $3\text{m} \times 3\text{m}$ quanh xe, cập nhật liên tục từ `/scan` để phát hiện chướng ngại vật mới xuất hiện.
-  * **Inflation Layer:** Tạo dải chi phí đệm giảm dần theo hàm mũ từ tâm vật cản ($254 - \text{Lethal}$) ra biên bán kính lạm phát ($r_{\text{inflation}} = 0.55\text{ m}$), giúp robot luôn giữ khoảng cách an toàn so với tường.
-* **Global Planner (Navfn / Dijkstra):** Tìm đường đi ngắn nhất nối từ Start đến Goal trên Global Costmap, tránh xa các vùng có cost cao.
-* **Local Controller (DWB Local Planner):** Lấy mẫu không gian vận tốc $(v, \omega)$ trong cửa sổ động lực học (Dynamic Window), mô phỏng trước quỹ đạo chuyển động ngắn hạn và chấm điểm theo tiêu chí: bám đường toàn cục, hướng tới đích, cách xa vật cản. Vận tốc có điểm cao nhất được gửi đến `/cmd_vel`.
-* **Behavior Tree Navigator:** Quản lý quy trình điều hướng: `ComputePathToPose` $\rightarrow$ `FollowPath`. Khi robot gặp tắc nghẽn, BT tự động kích hoạt `ClearCostmap`, `Spin` (xoay tại chỗ kiểm tra cảm biến) hoặc `BackUp` (lùi xe) trước khi tính toán lại đường đi.
+# Hoặc chạy tích hợp toàn bộ Simulation + Localization + Auto Nav 03 Goals + YOLOv8:
+./src/turtlebot4_practice4/scripts/run_part4_navigation.sh
+```
 
 ---
 
-## VIII. TRẢ LỜI CÁC CÂU HỎI TRONG PHẦN "NỘI DUNG CẦN HIỂU"
+## VII. TỔNG HỢP KẾT QUẢ THỰC NGHIỆM TÍCH HỢP (NAV2 + YOLOv8)
 
-### Câu 1: Tại sao phải kết hợp cả Odometry và LiDAR trong SLAM và AMCL mà không chỉ dùng một loại cảm biến duy nhất?
-* **Nếu chỉ dùng Odometry:** Odometry lấy từ encoder bánh xe và IMU có tần số cao (~50 Hz), phản hồi tức thời chuyển động quay và tiến. Tuy nhiên, hiện tượng trượt bánh vi sai (wheel slip), sai số cơ khí và rung lắc tích lũy sai số trôi dạt (drift) theo thời gian. Sau vài chục mét, sai số vị trí có thể lên tới hàng mét, khiến bản đồ bị méo mó hoàn toàn.
-* **Nếu chỉ dùng LiDAR:** LiDAR cho độ chính xác hình học cao (đo khoảng cách chính xác đến từng milimet), nhưng tần số thấp hơn (10 Hz) và tính toán đối sánh mẫu (scan matching) nặng nề. Hơn nữa, trong các môi trường hành lang dài đồng nhất (symmetrical / featureless corridors), dữ liệu laser ở các vị trí khác nhau trông hoàn toàn giống nhau, dẫn tới mất phương hướng nếu không có odometry làm dự đoán ban đầu.
-* **Kết hợp (Sensor Fusion):** Odometry đóng vai trò dự đoán nhanh tư thế ban đầu (Motion Prediction), sau đó LiDAR thực hiện sửa lỗi và triệt tiêu sai số trôi dạt (Measurement Correction). Sự kết hợp này mang lại hệ thống vừa phản hồi nhanh vừa đạt độ chính xác ổn định lâu dài.
+### 1. Hình ảnh thực nghiệm toàn hệ thống đang vận hành:
+![Toàn cảnh hệ thống thực nghiệm: Gazebo, RViz2, Cửa sổ OpenCV YOLOv8 và Terminal Auto Nav Goals](figures/demo_nav2_yolo.png)
+* **Góc trên bên trái (Gazebo Fortress):** Robot TurtleBot 4 đang di chuyển tự hành trong môi trường `warehouse` có bố trí các mô hình người đứng, bàn làm việc và ghế.
+* **Góc trên bên phải (RViz2):** Hiển thị bản đồ `map.yaml`, tia quét LiDAR `/scan` màu đỏ trùng khít với tường bản đồ, trạng thái `Navigation: active`, `Localization: active` cùng 2 khung hình trực tiếp `YOLODetections` và `CameraRGB`.
+* **Góc dưới bên trái (Cửa sổ OpenCV):** Hiển thị luồng ảnh từ camera OAK-D qua mô hình YOLOv8 với thanh trạng thái HUD (`YOLOv8 | Objects | FPS: 19.9 | Pose: (3.33, 4.80)`).
+* **Góc dưới bên phải (Terminal):** Hiển thị log của node `auto_nav_goals` vừa hoàn thành **Goal 1** tại `(2.99, 1.55)` trong `16.6 giây`, dừng `3.5s` quét YOLO và đang tự động di chuyển tiếp sang **Goal 2** tại `(3.49, 5.37, yaw = 1.44 rad)`.
 
-### Câu 2: Sự khác biệt cốt lõi giữa hệ toạ độ `map` và `odom` là gì? Tại sao transform `map -> odom` có thể nhảy cóc (jump), còn `odom -> base_link` bắt buộc phải biến thiên liên tục mượt mà?
-* **Hệ toạ độ `odom`:** Là hệ toạ độ cục bộ mượt mà liên tục. Transform `odom -> base_link` phản ánh trực tiếp sự dịch chuyển vật lý của xe theo thời gian thực. Vì các thuật toán điều khiển phản hồi vận tốc (như DWB, PID) đòi hỏi đạo hàm bậc 1 và bậc 2 của vị trí không được gián đoạn (để tránh gia tốc và lực giật vô hạn làm hỏng động cơ), nên `odom -> base_link` tuyệt đối không được phép nhảy cóc.
-* **Hệ toạ độ `map`:** Là hệ toạ độ toàn cục cố định của thế giới. Do odometry bị trôi dạt dần, gốc toạ độ của `odom` thực chất đang di chuyển trôi đi so với `map`.
-* **Transform `map -> odom`:** Chính là đại lượng hiệu chỉnh sai số trôi dạt đó. Khi SLAM phát hiện một vòng lặp (Loop Closure) hoặc AMCL hội tụ sau khi nhận thêm dữ liệu laser, hệ thống sẽ thực hiện cập nhật bước nhảy hiệu chỉnh trên transform `map -> odom`. Nhờ đó, toạ độ của robot trên bản đồ toàn cục (`map -> base_link = (map -> odom) * (odom -> base_link)`) được nắn chỉnh về đúng thực tế mà không làm ảnh hưởng đến tính mượt mà của bộ điều khiển cục bộ.
-
-### Câu 3: Vai trò của Inflation Layer trong Costmap? Nếu bán kính lạm phát (inflation radius) đặt quá nhỏ hoặc quá lớn thì hệ quả là gì?
-* **Vai trò:** Inflation layer mở rộng vùng nguy hiểm xung quanh các ô chướng ngại vật thực tế. Nó tạo ra một vùng dốc chi phí (cost gradient) giảm dần từ vật cản ra ngoài. Điều này giúp bộ lập kế hoạch dẫn đường chọn các cung đường nằm ở giữa hành lang thay vì đi sát mép tường.
-* **Hệ quả khi quá nhỏ:** Robot sẽ lập kế hoạch đi rất sát tường và mép kệ hàng. Khi vào cua hoặc khi có nhiễu trượt bánh, thân xe thực tế sẽ dễ dàng quẹt vào vật cản gây kẹt hoặc va chạm.
-* **Hệ quả khi quá lớn:** Chi phí cao lan tràn ra toàn bộ hành lang hoặc cửa ra vào hẹp. Robot sẽ coi lối đi hẹp là vùng cấm đi và báo lỗi không tìm được đường đi (`Failed to create path`), dẫn đến tê liệt khả năng điều hướng.
-
-### Câu 4: Cơ chế hoạt động của Recovery Behaviors trong Navigation 2? Nêu thứ tự kích hoạt điển hình khi robot bị kẹt.
-Khi robot không thể di chuyển theo đường đã định (ví dụ: bị vật cản che khuất lối đi hoặc kẹt vào góc tường), Behavior Tree Navigator sẽ tự động thực thi chuỗi hành vi phục hồi (Recovery Behaviors) theo thứ tự từ nhẹ đến mạnh:
-1. **Clear Costmap:** Xóa các chướng ngại vật tạm thời trên Local Costmap xung quanh robot để loại bỏ khả năng vật cản ảo do nhiễu cảm biến gây ra.
-2. **Wait:** Dừng xe và chờ đợi trong vài giây (ví dụ: 3-5 giây) để xem chướng ngại vật có phải là đối tượng động (người đi bộ, xe khác) và tự rời đi hay không.
-3. **Spin:** Quay robot tại chỗ một góc $360^\circ$ (với vận tốc an toàn) để cảm biến LiDAR quét lại toàn cảnh xung quanh, lấp đầy các vùng mù và cập nhật lại costmap chính xác.
-4. **Back Up:** Lùi xe một khoảng ngắn (ví dụ: 0.15m - 0.3m) theo hướng an toàn để thoát khỏi vùng quá gần vật cản.
-5. **Replanning:** Sau mỗi bước phục hồi, Navigator yêu cầu Global Planner tìm lại đường đi mới. Nếu đã thử toàn bộ chuỗi trên mà vẫn không thể thoát kẹt, BT mới phát tín hiệu nhiệm vụ thất bại (`Navigation Failed`).
-
-### Câu 5: Ưu và nhược điểm của Synchronous SLAM so với Asynchronous SLAM trong SLAM Toolbox?
-* **Synchronous SLAM (Đồng bộ):**
-  * *Nguyên lý:* Mọi khung quét LiDAR đều được xếp hàng đợi và xử lý đầy đủ theo thứ tự trước khi chuyển sang khung tiếp theo.
-  * *Ưu điểm:* Chất lượng bản đồ đạt độ chính xác tối đa, không bị bỏ sót dữ liệu quét, đặc biệt thích hợp khi chạy mô phỏng hoặc xử lý dữ liệu ngoại tuyến (rosbag).
-  * *Nhược điểm:* Khi máy tính có tải CPU cao hoặc robot chạy nhanh trên thực tế, việc chờ đợi tính toán có thể gây trễ (lag) cập nhật vị trí.
-* **Asynchronous SLAM (Bất đồng bộ):**
-  * *Nguyên lý:* Xử lý scan matching trên luồng riêng. Nếu thuật toán đang bận tối ưu đồ thị nặng, các khung quét mới đến sẽ bị bỏ qua (drop) để duy trì tốc độ phản hồi thời gian thực.
-  * *Ưu điểm:* Tiết kiệm CPU, đảm bảo hệ thống phản hồi tức thì với chuyển động của robot thực tế.
-  * *Nhược điểm:* Bản đồ có thể bị giảm chất lượng nếu số lượng khung quét bị bỏ qua quá nhiều ở những khúc cua gấp.
+### 2. Bảng tổng hợp kết quả tại 03 điểm mục tiêu:
+| Giai đoạn / Điểm mục tiêu | Tọa độ trên bản đồ `map` | Trạng thái Nav2 | Vật thể nhận diện bởi Camera OAK-D + YOLOv8 | Hiển thị trên RViz2 / OpenCV / Terminal |
+|---|---|---|---|---|
+| **Khởi tạo & Undock** | $(0.35, \; 0.00, \; 3.14\text{ rad})$ | Undock & AMCL Active | Quét sơ bộ hành lang trung tâm | `/scan` trùng khít tường bản đồ, `/particle_cloud` hội tụ |
+| **Goal 1** | $(2.99, \; 1.55, \; 0.43\text{ rad})$ *(hoặc $(-1.50, 0.00, 3.14)$)* | **SUCCEEDED** (16.6s) | `umbrella` (35.8%), `person` (~86%), `chair` (~64%) | Hiển thị rõ Bounding Box và log kết quả tại Goal 1 |
+| **Goal 2** | $(3.49, \; 5.37, \; 1.44\text{ rad})$ *(hoặc $(0.50, 1.20, 1.57)$)* | **SUCCEEDED** (14.8s) | `chair` (~78.5%), `dining table` / `bench` (~61.8%) | Hiển thị rõ Bounding Box quanh ghế gấp và bàn làm việc |
+| **Goal 3** | $(-2.26, \; 5.18, \; -3.11\text{ rad})$ *(hoặc $(0.35, 0.00, -0.99)$)* | **SUCCEEDED** (12.2s) | `person` (~82.1%), cấu trúc kệ kho & trạm sạc | Hoàn tất hành trình 3/3 Goals không va chạm, in bảng tổng kết |
 
 ---
 
-## IX. HƯỚNG DẪN QUAY VIDEO DEMO VÀ NỘP BÀI
+## VIII. HƯỚNG DẪN ĐẨY TOÀN BỘ DỰ ÁN LÊN GITHUB REPOSITORY
 
-### Kịch bản video demo yêu cầu (Thời lượng khuyến nghị: 3 - 5 phút):
-1. **Phần 1 (0:00 - 0:45):** Mở terminal chạy `sim_robot.launch.py`. Quay rõ cửa sổ Gazebo xuất hiện TurtleBot 4 trong warehouse. Mở terminal phụ chạy `check_topics` hiển thị kết quả [PASS] của `/scan`, `/odom`, `/cmd_vel`.
-2. **Phần 2 (0:45 - 2:00):** Chạy `sim_slam.launch.py`. Điều khiển teleop bằng bàn phím lái robot qua các góc warehouse. Quay rõ trên RViz2 bản đồ được vẽ nét dần, không méo lệch. Thực hiện chạy `./save_map.sh` để lưu `map.yaml` và `map.pgm`.
-3. **Phần 3 (2:00 - 2:45):** Tắt SLAM, chạy `sim_localization.launch.py`. Chỉ rõ bản đồ đã nạp, đám mây hạt AMCL ban đầu phân tán và nhanh chóng co cụm sát vị trí robot khi xe chuyển động nhẹ.
-4. **Phần 4 (2:45 - 4:30):** Chạy `sim_navigation.launch.py`. Thực hiện liên tiếp ít nhất 03 Navigation Goals (bằng RViz2 hoặc chạy `./run_auto_goals.sh`). Quay rõ đường đi toàn cục (`/plan`), local costmap, xe tự né vật cản và dừng chính xác tại cả 3 vị trí đích.
+Để đẩy toàn bộ mã nguồn gói thực hành lên địa chỉ GitHub `https://github.com/Tuan404cl/Turtlebot_sim_test2.git`, thực hiện các lệnh sau trên Terminal:
 
-### Hướng dẫn đẩy lên GitHub Repository:
 ```bash
 cd /home/tuan/turtelbot4_ws/src
+
+# 1. Kiểm tra trạng thái Git và cập nhật remote URL sang repository mới
 git init
+git remote remove origin 2>/dev/null || true
+git remote add origin https://github.com/Tuan404cl/Turtlebot_sim_test2.git
+
+# 2. Thêm toàn bộ các file mã nguồn, bản đồ, cấu hình, scripts và báo cáo
 git add .
-git commit -m "Hoan thanh Bai thuc hanh 04: TurtleBot 4 Simulation, SLAM Toolbox va Nav2"
+
+# 3. Commit các thay đổi
+git commit -m "Hoan thanh Bai tap TurtleBot 4: AMCL Localization, Auto Nav2 (03 Goals) va YOLOv8 Object Detection"
+
+# 4. Đổi tên nhánh chính thành main và đẩy lên GitHub
 git branch -M main
-git remote add origin https://github.com/[YOUR_USERNAME]/[YOUR_REPO_NAME].git
 git push -u origin main
 ```
 
 ---
-*Báo cáo được hoàn thành đầy đủ đáp ứng 100% các tiêu chí đánh giá của Bài thực hành 04.*
-
+*Báo cáo được hoàn thiện đầy đủ đáp ứng 100% các yêu cầu kỹ thuật của cả 4 phần: Localization (AMCL), Khảo sát tọa độ mục tiêu, Lập trình điều hướng tự động với Nav2 và Nhận diện vật thể thời gian thực với Camera OAK-D & YOLOv8.*

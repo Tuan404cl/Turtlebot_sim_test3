@@ -32,6 +32,9 @@ setup(
             'auto_nav_goals = turtlebot4_practice4.auto_nav_goals:main',
             'auto_undock = turtlebot4_practice4.auto_undock:main',
             'tf_relay = turtlebot4_practice4.tf_relay:main',
+            'yolo_detector = turtlebot4_practice4.yolo_detector:main',
+            'goal_survey = turtlebot4_practice4.goal_survey:main',
+            'spawn_yolo_objects = turtlebot4_practice4.spawn_yolo_objects:main',
         ],
     },
 )

@@ -56,6 +56,12 @@ def generate_launch_description():
         DeclareLaunchArgument('auto_navigate', default_value='true',
                               choices=['true', 'false'],
                               description='Tự động gửi 03 Navigation Goals khi Nav2 sẵn sàng'),
+        DeclareLaunchArgument('spawn_objects', default_value='true',
+                              choices=['true', 'false'],
+                              description='Tự động thêm mô hình người, ghế, bàn quanh các điểm Goal'),
+        DeclareLaunchArgument('enable_yolo', default_value='true',
+                              choices=['true', 'false'],
+                              description='Khởi chạy Node nhận diện vật thể YOLOv8 từ Camera OAK-D'),
     ]
 
     # 1. Gazebo Simulation (GroupAction scoped=True để tránh rviz argument ghi đè ra ngoài)
@@ -72,6 +78,20 @@ def generate_launch_description():
         ],
         scoped=True,
         condition=IfCondition(LaunchConfiguration('launch_sim'))
+    )
+
+    # 1b. Thêm mô hình người, ghế, bàn quanh các điểm Goal ở giây thứ 8
+    spawn_objects_node = Node(
+        package='turtlebot4_practice4',
+        executable='spawn_yolo_objects',
+        name='spawn_yolo_objects',
+        output='screen',
+        parameters=[{'world': LaunchConfiguration('world')}],
+        condition=IfCondition(LaunchConfiguration('spawn_objects'))
+    )
+    delayed_spawn_objects = TimerAction(
+        period=8.0,
+        actions=[spawn_objects_node]
     )
 
     # 2. TF Relay & Helper services (chạy sớm sau 3s)
@@ -130,6 +150,20 @@ def generate_launch_description():
         actions=[undock_node]
     )
 
+    # 5b. Khởi chạy Node YOLOv8 Object Detection ở giây thứ 20
+    yolo_node = Node(
+        package='turtlebot4_practice4',
+        executable='yolo_detector',
+        name='yolo_detector_node',
+        output='screen',
+        parameters=[{'use_sim_time': LaunchConfiguration('use_sim_time')}],
+        condition=IfCondition(LaunchConfiguration('enable_yolo'))
+    )
+    delayed_yolo = TimerAction(
+        period=20.0,
+        actions=[yolo_node]
+    )
+
     # 6. Nav2 Navigation (Planner, Controller, Recoveries, BT Navigator) - chờ 32s khi robot đã undock xong hoàn toàn
     navigation = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([tb4_nav_launch]),
@@ -161,10 +195,12 @@ def generate_launch_description():
     ld = LaunchDescription(arguments)
     ld.add_action(set_fastdds)
     ld.add_action(simulation)
+    ld.add_action(delayed_spawn_objects)
     ld.add_action(delayed_undock)
     ld.add_action(delayed_tf_relay)
     ld.add_action(delayed_localization)
     ld.add_action(delayed_rviz)
+    ld.add_action(delayed_yolo)
     ld.add_action(delayed_navigation)
     ld.add_action(delayed_nav_goals)
     return ld

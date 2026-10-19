@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# Script thực thi Phần 4: Autonomous Navigation với Nav2
+# Script chạy tích hợp toàn bộ: Localization + Nav2 Auto 03 Goals + YOLOv8
 # ==============================================================================
 set -e
 
@@ -16,17 +16,22 @@ export FASTRTPS_DEFAULT_PROFILES_FILE="/home/tuan/turtelbot4_ws/src/turtlebot4_p
 
 MAP_FILE="/home/tuan/turtelbot4_ws/src/turtlebot4_practice4/maps/map.yaml"
 
-echo "======================================================="
-echo "   PHẦN 4: AUTONOMOUS NAVIGATION VỚI NAV2             "
-echo "======================================================="
+echo "======================================================================"
+echo "   CHẠY TÍCH HỢP: LOCALIZATION + NAV2 (03 GOALS) + YOLOv8 DETECTION   "
+echo "======================================================================"
 echo "Bản đồ sử dụng: $MAP_FILE"
-echo "1. Đang khởi chạy Gazebo simulation + Nav2 Stack + RViz2..."
-echo "2. LƯU Ý QUAN TRỌNG: Trong 10-15 giây đầu tiên, Gazebo đang nạp thế giới và robot,"
-echo "   các cảnh báo 'Timed out waiting for transform' là hoàn toàn BÌNH THƯỜNG."
-echo "   Hãy kiên nhẫn đợi 15-20s để diffdrive_controller nạp xong, Nav2 sẽ Active hoàn toàn!"
-echo "3. Cách 1: Trên RViz2, nhấn 'Nav2 Goal' trên thanh công cụ và click chọn đích đến."
-echo "4. Cách 2: Mở terminal khác và chạy ./run_auto_goals.sh để robot tự đi qua 3 điểm."
-echo "======================================================="
+echo "1. Khởi chạy Gazebo simulation (warehouse) + thêm mô hình người, ghế, bàn."
+echo "2. Khởi chạy Map Server + AMCL Localization + Nav2 Stack + RViz2."
+echo "3. Tự động Undock robot và thiết lập Initial Pose (0.35, 0.0, 3.14)."
+echo "4. Khởi chạy Node YOLOv8 nhận diện vật thể từ Camera OAK-D."
+echo "5. Tự động điều khiển robot đi qua tuần tự Goal 1 -> Goal 2 -> Goal 3."
+echo "======================================================================"
 
-ros2 launch turtlebot4_practice4 sim_navigation.launch.py map:="$MAP_FILE" world:=warehouse rviz:=true
-
+ros2 launch turtlebot4_practice4 sim_navigation.launch.py \
+    map:="$MAP_FILE" \
+    world:=warehouse \
+    rviz:=true \
+    spawn_objects:=true \
+    enable_yolo:=true \
+    auto_navigate:=true
+ 

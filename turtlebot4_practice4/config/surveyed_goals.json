@@ -1,0 +1,22 @@
+{
+  "goals": [
+    {
+      "name": "Goal 1: Điểm khảo sát trên RViz2 (2.99, 1.55)",
+      "x": 2.99,
+      "y": 1.55,
+      "yaw": 0.43
+    },
+    {
+      "name": "Goal 2: Điểm khảo sát trên RViz2 (3.49, 5.37)",
+      "x": 3.49,
+      "y": 5.37,
+      "yaw": 1.44
+    },
+    {
+      "name": "Goal 3: Điểm khảo sát trên RViz2 (-2.26, 5.18)",
+      "x": -2.26,
+      "y": 5.18,
+      "yaw": -3.11
+    }
+  ]
+}
