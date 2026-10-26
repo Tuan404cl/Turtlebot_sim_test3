@@ -10,7 +10,7 @@ Dự án thực hành hoàn chỉnh cho robot **TurtleBot 4 Standard** trong mô
 * **Mã số sinh viên (MSSV):** 23020767
 * **Giảng viên hướng dẫn:** PGS.TS. Hoàng Văn Xiêm, CN. Nguyễn Quốc Bảo
 * **Video Demo (Google Drive - Chế độ công khai):** [Xem Video Demo trên Google Drive](https://drive.google.com/drive/folders/1vl4O0C9A4C3Ed_HwHmJAeVCzwEQZulCx?usp=drive_link)
-* **GitHub Repository (Public):** `https://github.com/Tuan404cl/Turtlebot_sim_test2.git`
+* **GitHub Repository (Public):** `https://github.com/Tuan404cl/Turtlebot_sim_test3.git`
 * **Báo cáo kỹ thuật chi tiết (Markdown):** [turtlebot4_practice4/docs/bao_cao_thuc_hanh_04.md](turtlebot4_practice4/docs/bao_cao_thuc_hanh_04.md)
 * **Báo cáo kỹ thuật (HTML):** [turtlebot4_practice4/docs/bao_cao_thuc_hanh_04.html](turtlebot4_practice4/docs/bao_cao_thuc_hanh_04.html)
 * **Báo cáo kỹ thuật (PDF):** [turtlebot4_practice4/docs/bao_cao_thuc_hanh_04.pdf](turtlebot4_practice4/docs/bao_cao_thuc_hanh_04.pdf)
@@ -66,6 +66,52 @@ source /opt/ros/humble/setup.bash
 colcon build --symlink-install
 source install/setup.bash
 
-# 2. Chạy tích hợp tự động toàn bộ Phần 1 -> Phần 4:
+# 2. Chạy tích hợp Bài tập Điều khiển Hành vi TurtleBot 4 bằng Cử chỉ tay AI (MediaPipe + OpenCV):
+./src/turtlebot4_practice4/scripts/run_gesture_all.sh
+
+# 3. Hoặc chạy tích hợp Bài tập AMCL Localization + Auto Nav2 + YOLOv8:
 ./src/turtlebot4_practice4/scripts/run_part4_navigation.sh
+```
+
+---
+
+## 🖐️ Bài Tập Điều Khiển Hành Vi TurtleBot 4 Bằng Cử Chỉ Tay AI (MediaPipe Gesture Recognizer)
+
+### 1. Kiến trúc các ROS 2 Nodes và Launch Files
+* **`webcam_cmdvel_check`** ([`webcam_cmdvel_check.py`](turtlebot4_practice4/turtlebot4_practice4/webcam_cmdvel_check.py)): Kiểm tra nhận lệnh vận tốc qua `/cmd_vel` (tiến, lùi, xoay trái–phải) trong Gazebo và đọc/hiển thị hình ảnh từ Webcam laptop bằng OpenCV.
+* **`gesture_recognition_node`** ([`gesture_recognition_node.py`](turtlebot4_practice4/turtlebot4_practice4/gesture_recognition_node.py)):
+  * Đọc hình ảnh thời gian thực từ Webcam laptop bằng OpenCV.
+  * Sử dụng **MediaPipe Gesture Recognizer** (`gesture_recognizer.task`) kết hợp phân tích động học 21 điểm khớp bàn tay (Hand Landmarks) để phát hiện và phân loại **06 cử chỉ tay**.
+  * Hiển thị khung xương bàn tay, tên cử chỉ, độ tin cậy (%) và trạng thái Robot trên cửa sổ OpenCV.
+  * Publish kết quả nhận diện đã lọc chống nhiễu lên topic `/detected_gesture` (`std_msgs/msg/String`).
+* **`robot_behavior_node`** ([`robot_behavior_node.py`](turtlebot4_practice4/turtlebot4_practice4/robot_behavior_node.py)):
+  * Subscribe `/detected_gesture` (`std_msgs/msg/String`) và điều khiển TurtleBot 4 qua topic `/cmd_vel` (`geometry_msgs/msg/Twist`).
+  * Máy trạng thái hữu hạn (FSM) yêu cầu xác nhận bằng **Giơ ngón cái (`Thumbs_Up`)** trước khi thực thi hành vi, kèm cơ chế chống nhiễu (Debounce + Edge Trigger + Cooldown), tự động dừng khi nhận **`Open_Palm`** hoặc mất tín hiệu (Watchdog Timeout), và bảo vệ chống va chạm qua LiDAR (`/scan`).
+
+### 2. Bảng Ánh Xạ 06 Cử Chỉ Tay & Hành Vi Robot
+
+| Cử chỉ tay | Nhãn trên `/detected_gesture` | Hành vi của TurtleBot 4 |
+| :--- | :--- | :--- |
+| **Vẫy tay (Wave)** | `Wave` | Chọn hành vi: **Robot xoay trái–phải để chào lại** |
+| **Giơ 1 ngón tay (Pointing Up)** | `Pointing_Up` | Chọn hành vi: **Tiến–lùi 4 lần** |
+| **Giơ 2 ngón tay (Victory)** | `Victory` | Chọn hành vi: **Di chuyển theo quỹ đạo tròn** |
+| **Giơ ngón cái (Thumbs Up)** | `Thumbs_Up` | **Xác nhận và thực hiện** hành vi đã chọn |
+| **Xòe bàn tay (Open Palm)** | `Open_Palm` | **Robot dừng ngay lập tức** (Emergency Stop) |
+| **Nắm tay (Closed Fist)** | `Closed_Fist` | **Hủy hành vi hiện tại** và trở về trạng thái chờ (`IDLE`) |
+
+### 3. Hướng Dẫn Chạy Từng Phần Hoặc Tích Hợp
+
+```bash
+# Chạy tích hợp toàn bộ (Gazebo + Auto Undock ra vùng rộng + Gesture Node + Behavior Node):
+./src/turtlebot4_practice4/scripts/run_gesture_all.sh
+
+# Hoặc chạy riêng từng phần:
+# Phần 1 – Khởi chạy Simulation, kiểm tra /cmd_vel và hiển thị Webcam OpenCV:
+./src/turtlebot4_practice4/scripts/run_gesture_part1_sim_webcam.sh
+
+# Phần 2 – Nhận diện cử chỉ tay bằng AI (MediaPipe Gesture Recognizer):
+./src/turtlebot4_practice4/scripts/run_gesture_part2_recognition.sh
+
+# Phần 3 – Điều khiển hành vi TurtleBot 4 từ topic /detected_gesture:
+./src/turtlebot4_practice4/scripts/run_gesture_part3_behavior.sh
 ```

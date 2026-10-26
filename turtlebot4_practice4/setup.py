@@ -35,6 +35,9 @@ setup(
             'yolo_detector = turtlebot4_practice4.yolo_detector:main',
             'goal_survey = turtlebot4_practice4.goal_survey:main',
             'spawn_yolo_objects = turtlebot4_practice4.spawn_yolo_objects:main',
+            'webcam_cmdvel_check = turtlebot4_practice4.webcam_cmdvel_check:main',
+            'gesture_recognition_node = turtlebot4_practice4.gesture_recognition_node:main',
+            'robot_behavior_node = turtlebot4_practice4.robot_behavior_node:main',
         ],
     },
 )

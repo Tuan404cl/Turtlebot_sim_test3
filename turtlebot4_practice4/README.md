@@ -10,7 +10,7 @@ Dự án thực hành hoàn chỉnh cho robot **TurtleBot 4 Standard** trong mô
 * **Mã số sinh viên (MSSV):** 23020767
 * **Giảng viên hướng dẫn:** PGS.TS. Hoàng Văn Xiêm, CN. Nguyễn Quốc Bảo
 * **Video Demo (Google Drive - Chế độ công khai):** [Xem Video Demo trên Google Drive](https://drive.google.com/drive/folders/1vl4O0C9A4C3Ed_HwHmJAeVCzwEQZulCx?usp=drive_link)
-* **GitHub Repository (Public):** `https://github.com/Tuan404cl/Turtlebot_sim_test2.git`
+* **GitHub Repository (Public):** `https://github.com/Tuan404cl/Turtlebot_sim_test3.git`
 * **File báo cáo kỹ thuật Markdown:** [docs/bao_cao_thuc_hanh_04.md](docs/bao_cao_thuc_hanh_04.md)
 * **File báo cáo kỹ thuật HTML:** [docs/bao_cao_thuc_hanh_04.html](docs/bao_cao_thuc_hanh_04.html)
 * **File báo cáo PDF hoàn chỉnh:** [docs/bao_cao_thuc_hanh_04.pdf](docs/bao_cao_thuc_hanh_04.pdf)
@@ -127,6 +127,44 @@ Mở Terminal mới và chạy:
 ./src/turtlebot4_practice4/scripts/run_part4_yolo.sh
 ```
 * Node `yolo_detector.py` subscribe `/oakd/rgb/preview/image_raw`, chuyển đổi qua `cv_bridge`, nhận diện bằng `yolov8n.pt`, hiển thị Bounding Box + Class + Confidence lên cửa sổ OpenCV, publish lên `/yolo/detections/image` (xem trên RViz2) và in log ra Terminal.
+
+---
+
+## 🖐️ Điều Khiển Hành Vi TurtleBot 4 Bằng Cử Chỉ Tay AI (MediaPipe Gesture Recognizer + OpenCV)
+
+### 1. Chạy Tích Hợp Toàn Bộ Hệ Thống Điều Khiển Cử Chỉ Tay
+```bash
+./src/turtlebot4_practice4/scripts/run_gesture_all.sh
+```
+Lệnh trên tự động khởi chạy Gazebo Simulation (`warehouse`), tự động Undock và đưa robot ra khu vực trung tâm rộng rãi không vật cản, sau đó khởi chạy `robot_behavior_node` và `gesture_recognition_node`.
+
+### 2. Chạy Riêng Từng Phần
+* **Phần 1 – Khởi chạy Simulation, kiểm tra `/cmd_vel` và mở Webcam OpenCV:**
+  ```bash
+  # Terminal 1: Khởi chạy Gazebo Simulation
+  ./src/turtlebot4_practice4/scripts/run_part1_sim.sh
+
+  # Terminal 2: Kiểm tra /cmd_vel và hiển thị Webcam bằng OpenCV
+  ./src/turtlebot4_practice4/scripts/run_gesture_part1_sim_webcam.sh
+  ```
+* **Phần 2 – Nhận diện cử chỉ tay bằng AI (`gesture_recognition_node`):**
+  ```bash
+  ./src/turtlebot4_practice4/scripts/run_gesture_part2_recognition.sh
+  ```
+* **Phần 3 – Điều khiển hành vi TurtleBot 4 (`robot_behavior_node`):**
+  ```bash
+  ./src/turtlebot4_practice4/scripts/run_gesture_part3_behavior.sh
+  ```
+
+### 3. Bảng 06 Cử Chỉ Tay Và Hành Vi Tương Ứng Của Robot
+| Cử chỉ | Nhãn `/detected_gesture` | Hành vi của TurtleBot 4 |
+| :--- | :--- | :--- |
+| **Vẫy tay (Wave)** | `Wave` | Chọn hành vi: **Robot xoay trái–phải để chào lại** |
+| **Giơ 1 ngón tay (Pointing Up)** | `Pointing_Up` | Chọn hành vi: **Tiến–lùi 4 lần** |
+| **Giơ 2 ngón tay (Victory)** | `Victory` | Chọn hành vi: **Di chuyển theo quỹ đạo tròn** |
+| **Giơ ngón cái (Thumbs Up)** | `Thumbs_Up` | **Xác nhận và thực hiện** hành vi đã chọn |
+| **Xòe bàn tay (Open Palm)** | `Open_Palm` | **Robot dừng ngay lập tức** |
+| **Nắm tay (Closed Fist)** | `Closed_Fist` | **Hủy hành vi hiện tại** và trở về trạng thái chờ |
 
 ---
 
